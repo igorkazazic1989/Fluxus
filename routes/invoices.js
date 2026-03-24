@@ -35,3 +35,24 @@ invoiceRoutes.get('/', async (req, res) => {
   if (error) return res.status(500).json({ error: error.message });
   return res.json(data);
 });
+
+invoiceRoutes.post('/extract-invoice', async (req, res) => {
+  const { base64, mediaType } = req.body;
+  if (!base64) return res.status(400).json({ error: 'No file data' });
+  try {
+    const isPDF = mediaType === 'application/pdf';
+    const cb = isPDF
+      ? {type:'document',source:{type:'base64',media_type:'application/pdf',data:base64}}
+      : {type:'image',source:{type:'base64',media_type:mediaType,data:base64}};
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':process.env.ANTHROPIC_API_KEY,'anthropic-version':'2023-06-01'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:500,messages:[{role:'user',content:[cb,{type:'text',text:'Extract invoice details. Respond ONLY with valid JSON:\n{"client":"company name","invNum":"invoice number","amount":"total with currency symbol","email":"client email or empty","due":"due date or Not specified","confidence":0-100}'}]}]})
+    });
+    const d = await r.json();
+    const raw = d.content?.[0]?.text || '{}';
+    return res.json(JSON.parse(raw.replace(/```json|```/g,'').trim()));
+  } catch(err) {
+    return res.status(500).json({confidence:0,client:'',invNum:'',amount:'',email:'',due:''});
+  }
+});
