@@ -7,9 +7,9 @@ import { resendWebhookRoutes } from './routes/resendWebhook.js';
 import { runScheduledChases } from './jobs/chaseScheduler.js';
 
 const app = express();
-app.use(cors());
+app.use(cors({ origin: '*' }));
 app.use('/webhooks/stripe', express.raw({ type: 'application/json' }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use('/api/invoices', invoiceRoutes);
 app.use('/webhooks', webhookRoutes);
 app.use('/webhooks', resendWebhookRoutes);
