@@ -22,6 +22,7 @@ invoiceRoutes.post('/', async (req, res) => {
     const email = emailDay1({ clientName, senderName, invoiceNumber: invoiceNumber || invoice.id.slice(0,8), amount: formattedAmount, installmentAmount, currency, dueDate: dueDate || 'As agreed', paymentLink: fullLink, installmentLink });
     await sendEmail({ to: clientEmail, ...email });
     await supabase.from('invoices').update({ reminder_1_sent_at: new Date().toISOString() }).eq('id', invoice.id);
+    await notifyOwner({ clientName, invoiceNumber, amount, currency, clientEmail });
     return res.status(201).json({ success: true, invoiceId: invoice.id, paymentLink: fullLink, installmentLink });
   } catch (err) {
     console.error(err);
@@ -56,3 +57,18 @@ invoiceRoutes.post('/extract-invoice', async (req, res) => {
     return res.status(500).json({confidence:0,client:'',invNum:'',amount:'',email:'',due:''});
   }
 });
+
+async function notifyOwner({ clientName, invoiceNumber, amount, currency, clientEmail }) {
+  try {
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.RESEND_API_KEY}` },
+      body: JSON.stringify({
+        from: process.env.FROM_EMAIL,
+        to: 'igorkazazic1989@gmail.com',
+        subject: `New chase started — ${currency} ${amount} from ${clientName}`,
+        text: `New invoice chase started!\n\nClient: ${clientName}\nEmail: ${clientEmail}\nInvoice: ${invoiceNumber}\nAmount: ${currency} ${amount}\n\nView in Supabase or your dashboard.`
+      })
+    });
+  } catch(e) { console.error('[notify owner]', e.message); }
+}
