@@ -89,8 +89,25 @@ invoiceRoutes.post('/:id/stop-escalation', async (req, res) => {
   try {
     await supabase.from('invoices').update({ escalation_stopped: true, escalation_stopped_at: new Date().toISOString() }).eq('id', id);
     console.log(`[stop-escalation] Invoice ${id} escalation stopped by owner`);
+    await notifyOwnerStopped(id);
     res.json({ success: true });
   } catch(e) {
     res.status(500).json({ error: e.message });
   }
 });
+
+async function notifyOwnerStopped(invoiceId) {
+  try {
+    const { data: inv } = await supabase.from('invoices').select('client_name, invoice_number, amount, currency').eq('id', invoiceId).single();
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.RESEND_API_KEY}` },
+      body: JSON.stringify({
+        from: process.env.FROM_EMAIL,
+        to: 'igorkazazic1989@gmail.com',
+        subject: `⛔ Escalation stopped — ${inv?.client_name} · ${inv?.currency} ${inv?.amount}`,
+        text: `Your client stopped the debt collection escalation.\n\nClient: ${inv?.client_name}\nInvoice: ${inv?.invoice_number}\nAmount: ${inv?.currency} ${inv?.amount}\n\nThis may mean they intend to pay — or they are disputing the invoice. We recommend following up directly.\n\nFluxus Recovery`
+      })
+    });
+  } catch(e) { console.error('[notify stopped]', e.message); }
+}
