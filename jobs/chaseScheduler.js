@@ -56,9 +56,32 @@ export async function runScheduledChases() {
       else if (daysOld >= 14 && inv.reminder_2_sent_at && !inv.reminder_3_sent_at) {
         await sendEmail({ to: inv.client_email, ...emailDay14(vars) });
         await supabase.from('invoices').update({ reminder_3_sent_at: now.toISOString() }).eq('id', inv.id);
+      } else if (daysOld >= 21 && inv.reminder_3_sent_at && !inv.authorization_sent_at) {
+        await sendDay21Authorization(inv);
         console.log(`[Scheduler] Day 14 sent → ${inv.client_email}`);
       }
 
     } catch (err) { console.error(`[Scheduler] Failed ${inv.id}:`, err.message); }
   }
+}
+
+async function sendDay21Authorization(invoice) {
+  try {
+    const { emailDay21 } = await import('../emails/day21-authorization.js');
+    const daysOverdue = invoice.due_date ? Math.floor((Date.now() - new Date(invoice.due_date)) / 86400000) : 21;
+    const authorizationLink = `https://fluxusrecovery.com/authorize?id=${invoice.id}`;
+    const email = emailDay21({
+      clientName: invoice.client_name,
+      senderName: invoice.sender_name,
+      invoiceNumber: invoice.invoice_number,
+      amount: invoice.amount,
+      currency: invoice.currency || 'USD',
+      dueDate: invoice.due_date,
+      daysOverdue,
+      authorizationLink
+    });
+    await sendEmail({ to: invoice.user_id, subject: email.subject, html: email.html, text: email.text });
+    await supabase.from('invoices').update({ authorization_sent_at: new Date().toISOString() }).eq('id', invoice.id);
+    console.log(`[Day21] Authorization email sent for invoice ${invoice.id}`);
+  } catch(e) { console.error('[Day21]', e.message); }
 }
