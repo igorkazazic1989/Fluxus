@@ -72,3 +72,14 @@ async function notifyOwner({ clientName, invoiceNumber, amount, currency, client
     });
   } catch(e) { console.error('[notify owner]', e.message); }
 }
+
+invoiceRoutes.post('/:id/authorize', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await supabase.from('invoices').update({ authorized_at: new Date().toISOString(), status: 'authorized' }).eq('id', id);
+    console.log(`[authorize] Invoice ${id} authorized for debt collection`);
+    res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
