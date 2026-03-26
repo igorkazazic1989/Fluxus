@@ -83,3 +83,14 @@ invoiceRoutes.post('/:id/authorize', async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+invoiceRoutes.post('/:id/stop-escalation', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await supabase.from('invoices').update({ escalation_stopped: true, escalation_stopped_at: new Date().toISOString() }).eq('id', id);
+    console.log(`[stop-escalation] Invoice ${id} escalation stopped by owner`);
+    res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
