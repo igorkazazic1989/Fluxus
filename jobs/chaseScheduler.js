@@ -14,6 +14,9 @@ export async function runScheduledChases() {
 
   for (const inv of invoices) {
     const daysOld = now.diff(dayjs(inv.created_at), 'day');
+    console.log(`[Debug] id=${inv.id.slice(0,8)} daysOld=${daysOld} r1=${inv.reminder_1_sent_at} phone=${inv.client_phone}`);
+console.log(`[Debug] id=${inv.id.slice(0,8)} daysOld=${daysOld} 
+r1=${inv.reminder_1_sent_at} phone=${inv.client_phone}`);
     const daysOverdue = inv.due_date ? Math.max(0, now.diff(dayjs(inv.due_date), 'day')) : daysOld;
     const vars = {
       clientName: inv.client_name, senderName: inv.sender_name || 'Your provider',
