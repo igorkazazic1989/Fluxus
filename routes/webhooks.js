@@ -14,7 +14,7 @@ webhookRoutes.post('/stripe', async (req, res) => {
 
   if (event.type === 'checkout.session.completed' || event.type === 'payment_intent.succeeded') {
     const obj = event.data.object;
-    const invoiceId = obj.metadata?.invoice_id;
+    const invoiceId = obj.metadata?.fluxus_invoice_id || obj.metadata?.invoice_id;
     const type = obj.metadata?.type;
 
     if (invoiceId) {
