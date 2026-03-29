@@ -27,12 +27,16 @@ webhookRoutes.post('/stripe', async (req, res) => {
         const totalPaid = parseFloat((alreadyPaid + paid).toFixed(2));
         const fullAmount = parseFloat(inv?.amount || 0);
         const allPaid = totalPaid >= fullAmount * 0.99;
+        const installmentNum = !inv?.installment_1_paid_at ? 1 : !inv?.installment_2_paid_at ? 2 : 3;
+        const installmentUpdate = {};
+        installmentUpdate[`installment_${installmentNum}_paid_at`] = new Date().toISOString();
 
         await supabase.from('invoices').update({
           paid_amount: totalPaid,
           status: allPaid ? 'paid' : 'chasing',
           paid_at: allPaid ? new Date().toISOString() : null,
-          commission: allPaid ? parseFloat((totalPaid * 0.05).toFixed(2)) : null
+          commission: allPaid ? parseFloat((totalPaid * 0.05).toFixed(2)) : null,
+          ...installmentUpdate
         }).eq('id', invoiceId);
 
         console.log(`💳 Installment ${invoiceId} — paid so far: ${totalPaid}/${fullAmount} ${allPaid ? '✅ COMPLETE' : '⏳ partial'}`);
