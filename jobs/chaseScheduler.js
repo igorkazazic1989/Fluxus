@@ -49,7 +49,7 @@ r1=${inv.reminder_1_sent_at} phone=${inv.client_phone}`);
       else if (daysOld >= 10 && inv.reminder_2_sent_at && !inv.sms_2_sent_at && inv.client_phone) {
         await sendSMS({
           to: inv.client_phone,
-          body: `URGENT: Invoice ${vars.invoiceNumber} (${inv.currency} ${vars.amount}) is overdue. Pay in 4 days or this goes to debt collection: ${inv.stripe_payment_link}`
+          body: `URGENT: Invoice ${vars.invoiceNumber} (${inv.currency} ${vars.amount}) is overdue. Pay in 4 days or this goes to debt collection. Pay in full: ${inv.stripe_payment_link} Or pay in 3 parts: ${inv.stripe_installment_link}`
         });
         await supabase.from('invoices').update({ sms_2_sent_at: now.toISOString() }).eq('id', inv.id);
         console.log(`[Scheduler] Day 10 SMS sent → ${inv.client_phone}`);
