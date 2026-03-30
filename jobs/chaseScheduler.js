@@ -15,8 +15,7 @@ export async function runScheduledChases() {
   for (const inv of invoices) {
     const daysOld = now.diff(dayjs(inv.created_at), 'day');
     console.log(`[Debug] id=${inv.id.slice(0,8)} daysOld=${daysOld} r1=${inv.reminder_1_sent_at} phone=${inv.client_phone}`);
-console.log(`[Debug] id=${inv.id.slice(0,8)} daysOld=${daysOld} 
-r1=${inv.reminder_1_sent_at} phone=${inv.client_phone}`);
+
     const daysOverdue = inv.due_date ? Math.max(0, now.diff(dayjs(inv.due_date), 'day')) : daysOld;
     const vars = {
       clientName: inv.client_name, senderName: inv.sender_name || 'Your provider',
@@ -60,6 +59,8 @@ r1=${inv.reminder_1_sent_at} phone=${inv.client_phone}`);
         await sendEmail({ to: inv.client_email, ...emailDay14(vars) });
         await supabase.from('invoices').update({ reminder_3_sent_at: now.toISOString() }).eq('id', inv.id);
       } else if (daysOld >= 21 && inv.reminder_3_sent_at && !inv.authorization_sent_at) {
+        const { data: payout } = await supabase.from('user_payout_details').select('escalation_authorized').eq('user_id', inv.user_id).single();
+        if (!payout?.escalation_authorized) { console.log(`[Day21] Skipped — user not authorized ${inv.id}`); continue; }
         await sendDay21Authorization(inv);
         console.log(`[Scheduler] Day 21 authorization sent → ${inv.id}`);
       }
@@ -81,7 +82,7 @@ async function sendDay21Authorization(invoice) {
       currency: invoice.currency || 'USD',
       dueDate: invoice.due_date,
       daysOverdue,
-      authorizationLink
+      stopLink: authorizationLink
     });
     const { data: { user } } = await supabase.auth.admin.getUserById(invoice.user_id);
     const userEmail = user?.email;
