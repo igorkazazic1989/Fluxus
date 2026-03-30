@@ -63,6 +63,9 @@ export async function runScheduledChases() {
         if (!payout?.escalation_authorized) { console.log(`[Day21] Skipped — user not authorized ${inv.id}`); continue; }
         await sendDay21Authorization(inv);
         console.log(`[Scheduler] Day 21 authorization sent → ${inv.id}`);
+      } else if (daysOld >= 23 && inv.authorization_sent_at && !inv.escalation_stopped && !inv.escalated_at) {
+        await sendDay23Handover(inv);
+        console.log(`[Scheduler] Day 23 handover sent → ${inv.id}`);
       }
 
     } catch (err) { console.error(`[Scheduler] Failed ${inv.id}:`, err.message); }
@@ -91,4 +94,28 @@ async function sendDay21Authorization(invoice) {
     await supabase.from('invoices').update({ authorization_sent_at: new Date().toISOString() }).eq('id', invoice.id);
     console.log(`[Day21] Authorization email sent for invoice ${invoice.id}`);
   } catch(e) { console.error('[Day21]', e.message); }
+}
+
+async function sendDay23Handover(invoice) {
+  try {
+    const { data: { user } } = await supabase.auth.admin.getUserById(invoice.user_id);
+    const userEmail = user?.email;
+    if (!userEmail) { console.error('[Day23] No email found for user', invoice.user_id); return; }
+    const invoiceRef = invoice.invoice_number || invoice.id.slice(0,8).toUpperCase();
+    const subject = `Case ready for debt collection — Invoice ${invoiceRef}`;
+    const html = `<h2>Debt collection handover</h2>
+<p>The 48-hour window has passed. This case is ready to be submitted.</p>
+<table>
+<tr><td>Invoice</td><td>${invoiceRef}</td></tr>
+<tr><td>Debtor name</td><td>${invoice.client_name}</td></tr>
+<tr><td>Debtor email</td><td>${invoice.client_email}</td></tr>
+<tr><td>Debtor phone</td><td>${invoice.client_phone || 'Not provided'}</td></tr>
+<tr><td>Amount</td><td>${invoice.currency} ${Number(invoice.amount).toFixed(2)}</td></tr>
+<tr><td>Sender</td><td>${invoice.sender_name}</td></tr>
+<tr><td>Case ID</td><td>${invoice.id}</td></tr>
+</table>`;
+    await sendEmail({ to: userEmail, subject, html });
+    await supabase.from('invoices').update({ escalated_at: new Date().toISOString() }).eq('id', invoice.id);
+    console.log(`[Day23] Handover email sent for invoice ${invoice.id}`);
+  } catch(e) { console.error('[Day23]', e.message); }
 }
