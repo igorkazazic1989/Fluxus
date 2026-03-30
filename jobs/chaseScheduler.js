@@ -61,7 +61,7 @@ r1=${inv.reminder_1_sent_at} phone=${inv.client_phone}`);
         await supabase.from('invoices').update({ reminder_3_sent_at: now.toISOString() }).eq('id', inv.id);
       } else if (daysOld >= 21 && inv.reminder_3_sent_at && !inv.authorization_sent_at) {
         await sendDay21Authorization(inv);
-        console.log(`[Scheduler] Day 14 sent → ${inv.client_email}`);
+        console.log(`[Scheduler] Day 21 authorization sent → ${inv.id}`);
       }
 
     } catch (err) { console.error(`[Scheduler] Failed ${inv.id}:`, err.message); }
@@ -83,7 +83,10 @@ async function sendDay21Authorization(invoice) {
       daysOverdue,
       authorizationLink
     });
-    await sendEmail({ to: invoice.user_id, subject: email.subject, html: email.html, text: email.text });
+    const { data: { user } } = await supabase.auth.admin.getUserById(invoice.user_id);
+    const userEmail = user?.email;
+    if (!userEmail) { console.error('[Day21] No email found for user', invoice.user_id); return; }
+    await sendEmail({ to: userEmail, subject: email.subject, html: email.html, text: email.text });
     await supabase.from('invoices').update({ authorization_sent_at: new Date().toISOString() }).eq('id', invoice.id);
     console.log(`[Day21] Authorization email sent for invoice ${invoice.id}`);
   } catch(e) { console.error('[Day21]', e.message); }
