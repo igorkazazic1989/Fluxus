@@ -109,3 +109,42 @@ async function sendDay23Handover(invoice) {
     console.log(`[Day23] Handover email sent for invoice ${invoice.id}`);
   } catch(e) { console.error('[Day23]', e.message); }
 }
+
+export async function runInstallmentReminders() {
+  const now = new Date();
+  const { data: invoices } = await supabase
+    .from('invoices')
+    .select('*')
+    .eq('status', 'partially_paid');
+
+  if (!invoices?.length) return;
+  console.log(`[Installment] Checking ${invoices.length} partially paid invoices`);
+
+  for (const inv of invoices) {
+    try {
+      const installmentAmount = (Number(inv.amount) / 3).toFixed(2);
+
+      // Månad 2 — 30 dagar efter installment_1_paid_at
+      if (inv.installment_1_paid_at && !inv.installment_2_paid_at) {
+        const due = new Date(inv.installment_1_paid_at);
+        due.setDate(due.getDate() + 30);
+        const daysUntil = Math.ceil((due - now) / 86400000);
+        if (daysUntil <= 3 && daysUntil >= 0) {
+          await sendSMS({ to: inv.client_phone, body: `Reminder: Your 2nd installment of ${inv.currency} ${installmentAmount} for invoice ${inv.invoice_number} is due in ${daysUntil} days. Pay here: ${inv.stripe_installment_link}` });
+          console.log(`[Installment] Month 2 reminder sent → ${inv.client_phone}`);
+        }
+      }
+
+      // Månad 3 — 30 dagar efter installment_2_paid_at
+      if (inv.installment_2_paid_at && !inv.installment_3_paid_at) {
+        const due = new Date(inv.installment_2_paid_at);
+        due.setDate(due.getDate() + 30);
+        const daysUntil = Math.ceil((due - now) / 86400000);
+        if (daysUntil <= 3 && daysUntil >= 0) {
+          await sendSMS({ to: inv.client_phone, body: `Reminder: Your 3rd and final installment of ${inv.currency} ${installmentAmount} for invoice ${inv.invoice_number} is due in ${daysUntil} days. Pay here: ${inv.stripe_installment_link}` });
+          console.log(`[Installment] Month 3 reminder sent → ${inv.client_phone}`);
+        }
+      }
+    } catch(e) { console.error(`[Installment] Failed ${inv.id}:`, e.message); }
+  }
+}
