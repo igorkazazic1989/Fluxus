@@ -33,7 +33,7 @@ webhookRoutes.post('/stripe', async (req, res) => {
 
         await supabase.from('invoices').update({
           paid_amount: totalPaid,
-          status: allPaid ? 'paid' : 'chasing',
+          status: allPaid ? 'paid' : 'partially_paid',
           paid_at: allPaid ? new Date().toISOString() : null,
           commission: allPaid ? parseFloat((totalPaid * 0.05).toFixed(2)) : null,
           ...installmentUpdate
