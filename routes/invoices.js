@@ -34,7 +34,9 @@ invoiceRoutes.post('/', async (req, res) => {
 
     const formattedAmount = totalWithFee.toFixed(2);
     const installmentAmount = (totalWithFee / 3).toFixed(2);
-    const email = emailDay1({ clientName, senderName, invoiceNumber: invoiceNumber || invoice.id.slice(0,8), amount: formattedAmount, installmentAmount, currency, dueDate: dueDate || 'As agreed', paymentLink: fullLink, installmentLink });
+    const originalAmount = parseFloat(amount).toFixed(2);
+    const lateFeeRow = lateFee > 0 ? `<div class="inv-row"><span class="inv-label">Late fee (legal)</span><span style="color:#00b37a">+ ${currency} ${lateFee.toFixed(2)}</span></div>` : '';
+    const email = emailDay1({ clientName, senderName, invoiceNumber: invoiceNumber || invoice.id.slice(0,8), amount: formattedAmount, originalAmount, lateFeeRow, installmentAmount, currency, dueDate: dueDate || 'As agreed', paymentLink: fullLink, installmentLink });
     await sendEmail({ to: clientEmail, ...email });
     await supabase.from('invoices').update({ reminder_1_sent_at: new Date().toISOString() }).eq('id', invoice.id);
     await notifyOwner({ clientName, invoiceNumber, amount, currency, clientEmail });
