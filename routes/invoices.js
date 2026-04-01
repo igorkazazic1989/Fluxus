@@ -10,15 +10,30 @@ invoiceRoutes.post('/', async (req, res) => {
   const { userId, senderName, clientName, clientEmail, clientPhone, invoiceNumber, amount, currency = 'USD', dueDate } = req.body;
   if (!clientName || !clientEmail || !amount) return res.status(400).json({ error: 'clientName, clientEmail and amount required' });
   try {
-    const { data: invoice, error: dbError } = await supabase.from('invoices').insert({ user_id: userId, sender_name: senderName, client_name: clientName, client_email: clientEmail, client_phone: clientPhone || null, invoice_number: invoiceNumber, amount: parseFloat(amount), currency, due_date: dueDate || null, status: 'chasing' }).select().single();
+    // Calculate late fee based on jurisdiction
+  function calculateLateFee(amount, currency) {
+    if (currency === 'GBP') {
+      if (amount < 1000) return 40;
+      if (amount < 10000) return 70;
+      return 100;
+    }
+    if (currency === 'CAD') {
+      return parseFloat((amount * 0.05).toFixed(2));
+    }
+    return 0;
+  }
+  const lateFee = calculateLateFee(parseFloat(amount), currency);
+  const totalWithFee = parseFloat(amount) + lateFee;
+
+  const { data: invoice, error: dbError } = await supabase.from('invoices').insert({ user_id: userId, sender_name: senderName, client_name: clientName, client_email: clientEmail, client_phone: clientPhone || null, invoice_number: invoiceNumber, amount: parseFloat(amount), currency, due_date: dueDate || null, status: 'chasing' }).select().single();
     if (dbError) throw dbError;
 
-    const { fullLink, installmentLink } = await createPaymentLink({ invoiceId: invoice.id, clientName, amount: parseFloat(amount), currency, invoiceNumber });
+    const { fullLink, installmentLink } = await createPaymentLink({ invoiceId: invoice.id, clientName, amount: totalWithFee, currency, invoiceNumber });
 
-    await supabase.from('invoices').update({ stripe_payment_link: fullLink, stripe_installment_link: installmentLink }).eq('id', invoice.id);
+    await supabase.from('invoices').update({ stripe_payment_link: fullLink, stripe_installment_link: installmentLink, late_fee: lateFee }).eq('id', invoice.id);
 
-    const formattedAmount = parseFloat(amount).toFixed(2);
-    const installmentAmount = (parseFloat(amount) / 3).toFixed(2);
+    const formattedAmount = totalWithFee.toFixed(2);
+    const installmentAmount = (totalWithFee / 3).toFixed(2);
     const email = emailDay1({ clientName, senderName, invoiceNumber: invoiceNumber || invoice.id.slice(0,8), amount: formattedAmount, installmentAmount, currency, dueDate: dueDate || 'As agreed', paymentLink: fullLink, installmentLink });
     await sendEmail({ to: clientEmail, ...email });
     await supabase.from('invoices').update({ reminder_1_sent_at: new Date().toISOString() }).eq('id', invoice.id);
