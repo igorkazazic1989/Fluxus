@@ -11,18 +11,19 @@ invoiceRoutes.post('/', async (req, res) => {
   if (!clientName || !clientEmail || !amount) return res.status(400).json({ error: 'clientName, clientEmail and amount required' });
   try {
     // Calculate late fee based on jurisdiction
-  function calculateLateFee(amount, currency) {
+  function calculateLateFee(amount, currency, dueDate) {
     if (currency === 'GBP') {
       if (amount < 1000) return 40;
       if (amount < 10000) return 70;
       return 100;
     }
     if (currency === 'CAD') {
-      return parseFloat((amount * 0.05).toFixed(2));
+      const daysOverdue = dueDate ? Math.max(0, Math.floor((Date.now() - new Date(dueDate)) / 86400000)) : 0;
+      return parseFloat((amount * 0.05 / 365 * Math.max(daysOverdue, 1)).toFixed(2));
     }
     return 0;
   }
-  const lateFee = calculateLateFee(parseFloat(amount), currency);
+  const lateFee = calculateLateFee(parseFloat(amount), currency, dueDate);
   const totalWithFee = parseFloat(amount) + lateFee;
 
   const { data: invoice, error: dbError } = await supabase.from('invoices').insert({ user_id: userId, sender_name: senderName, client_name: clientName, client_email: clientEmail, client_phone: clientPhone || null, invoice_number: invoiceNumber, amount: parseFloat(amount), currency, due_date: dueDate || null, status: 'chasing' }).select().single();
