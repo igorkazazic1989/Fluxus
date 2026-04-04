@@ -45,7 +45,7 @@ export async function runScheduledChases() {
       }
 
       // DAY 10 — SMS eskalering
-      else if (daysOld >= 10 && inv.reminder_2_sent_at && !inv.sms_2_sent_at && inv.client_phone) {
+      if (daysOld >= 10 && inv.reminder_2_sent_at && !inv.sms_2_sent_at && inv.client_phone) {
         await sendSMS({
           to: inv.client_phone,
           body: `URGENT: Invoice ${vars.invoiceNumber} (${inv.currency} ${vars.amount}) is overdue. Pay in 4 days or this goes to debt collection. Pay in full: ${inv.stripe_payment_link} Or pay in 3 parts: ${inv.stripe_installment_link}`
@@ -55,15 +55,15 @@ export async function runScheduledChases() {
       }
 
       // DAY 14 — Collection notice email
-      else if (daysOld >= 14 && inv.reminder_2_sent_at && !inv.reminder_3_sent_at) {
+      if (daysOld >= 14 && inv.reminder_2_sent_at && !inv.reminder_3_sent_at) {
         await sendEmail({ to: inv.client_email, ...emailDay14(vars) });
         await supabase.from('invoices').update({ reminder_3_sent_at: now.toISOString() }).eq('id', inv.id);
-      } else if (daysOld >= 21 && inv.reminder_3_sent_at && !inv.authorization_sent_at) {
+      if (daysOld >= 21 && inv.reminder_3_sent_at && !inv.authorization_sent_at) {
         const { data: payout } = await supabase.from('user_payout_details').select('escalation_authorized').eq('user_id', inv.user_id).single();
         if (!payout?.escalation_authorized) { console.log(`[Day21] Skipped — user not authorized ${inv.id}`); continue; }
         await sendDay21Authorization(inv);
         console.log(`[Scheduler] Day 21 authorization sent → ${inv.id}`);
-      } else if (daysOld >= 23 && inv.authorization_sent_at && !inv.escalation_stopped && !inv.escalated_at) {
+      if (daysOld >= 23 && inv.authorization_sent_at && !inv.escalation_stopped && !inv.escalated_at) {
         await sendDay23Handover(inv);
         console.log(`[Scheduler] Day 23 handover sent → ${inv.id}`);
       }
