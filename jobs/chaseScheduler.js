@@ -58,11 +58,15 @@ export async function runScheduledChases() {
       if (daysOld >= 14 && inv.reminder_2_sent_at && !inv.reminder_3_sent_at) {
         await sendEmail({ to: inv.client_email, ...emailDay14(vars) });
         await supabase.from('invoices').update({ reminder_3_sent_at: now.toISOString() }).eq('id', inv.id);
+      }
+      // DAY 21 — Authorization
       if (daysOld >= 21 && inv.reminder_3_sent_at && !inv.authorization_sent_at) {
         const { data: payout } = await supabase.from('user_payout_details').select('escalation_authorized').eq('user_id', inv.user_id).single();
         if (!payout?.escalation_authorized) { console.log(`[Day21] Skipped — user not authorized ${inv.id}`); continue; }
         await sendDay21Authorization(inv);
         console.log(`[Scheduler] Day 21 authorization sent → ${inv.id}`);
+      }
+      // DAY 23 — Handover
       if (daysOld >= 23 && inv.authorization_sent_at && !inv.escalation_stopped && !inv.escalated_at) {
         await sendDay23Handover(inv);
         console.log(`[Scheduler] Day 23 handover sent → ${inv.id}`);
